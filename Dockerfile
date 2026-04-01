@@ -72,10 +72,10 @@ ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH="/app/env:$PYTHONPATH"
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:7860/health || exit 1
+HEALTHCHECK --interval=60s --timeout=30s --start-period=60s --retries=5 \
+    CMD curl -f http://localhost:7860/ || exit 1
 
 # Run the FastAPI server
 # The module path is constructed to work with the /app/env structure
 ENV ENABLE_WEB_INTERFACE=true
-CMD ["sh", "-c", "cd /app/env && uvicorn server.app:app --host 0.0.0.0 --port 7860"]
+CMD ["sh", "-c", "cd /app/env && uvicorn server.app:app --host 0.0.0.0 --port 7860 --timeout-keep-alive 75"]
