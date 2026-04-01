@@ -10,72 +10,26 @@
 # - Standalone environments (with openenv from PyPI/Git)
 # The build script (openenv build) handles context detection and sets appropriate build args.
 
-ARG BASE_IMAGE=ghcr.io/meta-pytorch/openenv-base:latest
-FROM ${BASE_IMAGE} AS builder
+FROM ghcr.io/meta-pytorch/openenv-base:latest
 
 WORKDIR /app
 
-# Ensure git is available (required for installing dependencies from VCS)
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends git && \
-    rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
-# Build argument to control whether we're building standalone or in-repo
-ARG BUILD_MODE=in-repo
-ARG ENV_NAME=meta
-
-# Copy environment code (always at root of build context)
 COPY . /app/env
 
-# For in-repo builds, openenv is already vendored in the build context
-# For standalone builds, openenv will be installed via pyproject.toml
 WORKDIR /app/env
 
-# Ensure uv is available (for local builds where base image lacks it)
 RUN if ! command -v uv >/dev/null 2>&1; then \
         curl -LsSf https://astral.sh/uv/install.sh | sh && \
-        mv /root/.local/bin/uv /usr/local/bin/uv && \
-        mv /root/.local/bin/uvx /usr/local/bin/uvx; \
-    fi
-    
-# Install dependencies using uv sync
-# If uv.lock exists, use it; otherwise resolve on the fly
-RUN --mount=type=cache,target=/root/.cache/uv \
-    if [ -f uv.lock ]; then \
-        uv sync --frozen --no-install-project --no-editable; \
-    else \
-        uv sync --no-install-project --no-editable; \
+        mv /root/.local/bin/uv /usr/local/bin/uv; \
     fi
 
-RUN --mount=type=cache,target=/root/.cache/uv \
-    if [ -f uv.lock ]; then \
-        uv sync --frozen --no-editable; \
-    else \
-        uv sync --no-editable; \
-    fi
+RUN uv sync --no-editable 2>/dev/null || pip install -e .
 
-# Final runtime stage
-FROM ${BASE_IMAGE}
-
-WORKDIR /app
-
-# Copy the virtual environment from builder
-COPY --from=builder /app/env/.venv /app/.venv
-
-# Copy the environment code
-COPY --from=builder /app/env /app/env
-
-# Set PATH to use the virtual environment
-ENV PATH="/app/.venv/bin:$PATH"
-
-# Set PYTHONPATH so imports work correctly
+ENV PATH="/app/env/.venv/bin:$PATH"
 ENV PYTHONPATH="/app/env:$PYTHONPATH"
 
-# Health check
-HEALTHCHECK --interval=60s --timeout=30s --start-period=60s --retries=5 \
-    CMD curl -f http://localhost:7860/ || exit 1
+EXPOSE 7860
 
-# Run the FastAPI server
-# The module path is constructed to work with the /app/env structure
-ENV ENABLE_WEB_INTERFACE=true
-CMD ["sh", "-c", "cd /app/env && uvicorn server.app:app --host 0.0.0.0 --port 7860 --timeout-keep-alive 75"]
+CMD ["uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "7860"]
