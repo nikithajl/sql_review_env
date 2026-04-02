@@ -9,12 +9,21 @@
 from uuid import uuid4
 
 from openenv.core.env_server.interfaces import Environment
-from openenv.core.env_server.types import State
 
 try:
-    from ..models import SqlReviewAction, SqlReviewObservation
+    from ..models import (
+        SqlReviewAction,
+        SqlReviewObservation,
+        SqlReviewReward,
+        SqlReviewState,
+    )
 except ImportError:
-    from models import SqlReviewAction, SqlReviewObservation
+    from models import (
+        SqlReviewAction,
+        SqlReviewObservation,
+        SqlReviewReward,
+        SqlReviewState,
+    )
 
 try:
     from .tasks import TASKS, TASK_INDEX
@@ -47,7 +56,7 @@ class SqlReviewEnvironment(Environment):
     SUPPORTS_CONCURRENT_SESSIONS: bool = True
 
     def __init__(self):
-        self._state = State(episode_id=str(uuid4()), step_count=0)
+        self._state = SqlReviewState(episode_id=str(uuid4()), step_count=0)
         self._current_task: dict | None = None
         self._last_feedback: str | None = None
 
@@ -63,7 +72,13 @@ class SqlReviewEnvironment(Environment):
             self._current_task = task
         else:
             self._current_task = random.choice(TASKS)
-        self._state = State(episode_id=str(uuid4()), step_count=0)
+        self._state = SqlReviewState(
+            episode_id=str(uuid4()),
+            step_count=0,
+            current_task_id=self._current_task["id"],
+            current_difficulty=self._current_task["difficulty"],
+            last_feedback=None,
+        )
         self._last_feedback = None
 
         return SqlReviewObservation(
@@ -93,9 +108,18 @@ class SqlReviewEnvironment(Environment):
         else:
             feedback = f"Needs improvement. Score: {score:.3f}. {breakdown}"
 
-        self._last_feedback = feedback
+        reward_details = SqlReviewReward(
+            score=score,
+            feedback=feedback,
+            breakdown=breakdown,
+        )
 
-        done = score >= 0.9 or self._state.step_count >= MAX_STEPS
+        self._last_feedback = reward_details.feedback
+
+        done = reward_details.score >= 0.9 or self._state.step_count >= MAX_STEPS
+        self._state.current_task_id = self._current_task["id"]
+        self._state.current_difficulty = self._current_task["difficulty"]
+        self._state.last_feedback = reward_details.feedback
 
         return SqlReviewObservation(
             task_id=self._current_task["id"],
@@ -104,12 +128,12 @@ class SqlReviewEnvironment(Environment):
             sql_to_review=self._current_task["buggy_sql"],
             schema_summary=SCHEMA_SUMMARY,
             step_number=self._state.step_count,
-            last_feedback=feedback,
+            last_feedback=reward_details.feedback,
             done=done,
-            reward=score,
-            metadata={"breakdown": breakdown},
+            reward=reward_details.score,
+            metadata={"reward": reward_details.model_dump()},
         )
 
     @property
-    def state(self) -> State:
+    def state(self) -> SqlReviewState:
         return self._state
