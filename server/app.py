@@ -31,13 +31,11 @@ app = create_app(
 
 @app.get("/")
 async def root():
-    from fastapi.responses import JSONResponse
-    return JSONResponse({"status": "healthy", "name": "sql_review_env"})
+    return {"status": "healthy", "name": "sql_review_env"}
 
 @app.get("/health")
 async def health():
-    from fastapi.responses import JSONResponse
-    return JSONResponse({"status": "healthy"})
+    return {"status": "healthy"}
 
 def main(host: str = "0.0.0.0", port: int = 7860):
     import uvicorn
