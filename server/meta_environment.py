@@ -51,9 +51,18 @@ class SqlReviewEnvironment(Environment):
         self._current_task: dict | None = None
         self._last_feedback: str | None = None
 
-    def reset(self) -> SqlReviewObservation:
-        """Start a new episode with a random task."""
-        self._current_task = random.choice(TASKS)
+    def reset(self, task_id: str | None = None) -> SqlReviewObservation:
+        """Start a new episode, optionally selecting a specific task."""
+        if task_id is not None:
+            task = TASK_INDEX.get(task_id)
+            if task is None:
+                available = ", ".join(sorted(TASK_INDEX))
+                raise ValueError(
+                    f"Unknown task_id '{task_id}'. Available tasks: {available}"
+                )
+            self._current_task = task
+        else:
+            self._current_task = random.choice(TASKS)
         self._state = State(episode_id=str(uuid4()), step_count=0)
         self._last_feedback = None
 
