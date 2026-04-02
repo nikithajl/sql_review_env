@@ -6,6 +6,7 @@
 
 """SQL Review Environment Implementation."""
 
+import random
 from uuid import uuid4
 
 from openenv.core.env_server.interfaces import Environment
@@ -32,7 +33,6 @@ except ImportError:
     from tasks import TASKS, TASK_INDEX
     from graders import grade
 
-import random
 
 SCHEMA_SUMMARY = """E-commerce database with 5 tables:
   users       (id, email, name, role, created_at, is_active)
@@ -46,7 +46,7 @@ MAX_STEPS = 3
 
 class SqlReviewEnvironment(Environment):
     """
-    SQL Review environment — agent fixes/audits/optimizes SQL queries.
+    SQL Review environment: agent fixes, audits, and optimizes SQL queries.
 
     Easy   tasks: fix buggy SQL (graded by result-set comparison)
     Medium tasks: audit security vulnerabilities (graded by pattern analysis)
@@ -72,6 +72,7 @@ class SqlReviewEnvironment(Environment):
             self._current_task = task
         else:
             self._current_task = random.choice(TASKS)
+
         self._state = SqlReviewState(
             episode_id=str(uuid4()),
             step_count=0,
@@ -93,9 +94,26 @@ class SqlReviewEnvironment(Environment):
             reward=0.0,
         )
 
-    def step(self, action: SqlReviewAction) -> SqlReviewObservation:
-        """Grade the agent's SQL and return reward + next observation."""
+    def step(
+        self,
+        action: SqlReviewAction,
+        task_id: str | None = None,
+    ) -> SqlReviewObservation:
+        """Grade the agent's SQL and return reward plus next observation."""
         self._state.step_count += 1
+
+        if self._current_task is None:
+            if task_id is None:
+                raise ValueError("task_id is required when no active task is loaded")
+            task = TASK_INDEX.get(task_id)
+            if task is None:
+                available = ", ".join(sorted(TASK_INDEX))
+                raise ValueError(
+                    f"Unknown task_id '{task_id}'. Available tasks: {available}"
+                )
+            self._current_task = task
+            self._state.current_task_id = task["id"]
+            self._state.current_difficulty = task["difficulty"]
 
         score, breakdown = grade(action.sql, self._current_task)
 
