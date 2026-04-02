@@ -28,7 +28,7 @@ MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Llama-3.3-70B-Instruct")
 ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:7860")
 
 MAX_STEPS   = 3
-TEMPERATURE = 0.1
+TEMPERATURE = 0.0
 MAX_TOKENS  = 1024
 OUTPUT_PATH = pathlib.Path(__file__).with_name("baseline_scores.json")
 
