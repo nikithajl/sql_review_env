@@ -1,12 +1,6 @@
-
-
-
-
-
-
 ---
-title: Sql Review Env Environment Server
-emoji: 📻
+title: SQL Review OpenEnv
+emoji: "🧠"
 colorFrom: blue
 colorTo: gray
 sdk: docker
@@ -14,247 +8,281 @@ pinned: false
 app_port: 7860
 tags:
   - openenv
+  - sql
+  - evaluation
 ---
 
-# Sql Review Env Environment
+# SQL Review OpenEnv
 
-A simple test environment that echoes back messages. Perfect for testing the env APIs as well as demonstrating environment usage patterns.
+SQL Review OpenEnv is a real-world OpenEnv environment for training and evaluating agents on SQL review tasks. The agent acts like a database engineer or code reviewer: it receives a buggy, insecure, or inefficient SQL query and must return a corrected version.
 
-## Quick Start
+This environment is designed to simulate work humans actually do in production systems:
+- fixing correctness bugs in SQL queries
+- identifying and removing insecure query patterns
+- optimizing slow queries without changing expected results
 
-The simplest way to use the Sql Review Env environment is through the `SqlReviewEnv` class:
+The environment is built around a small e-commerce schema and exposes a standard OpenEnv API through `reset()`, `step()`, and `state()`.
 
-```python
-from sql_review_env import SqlReviewAction, SqlReviewEnv
+## Why this environment matters
 
-try:
-    # Create environment from Docker image
-    sql_review_envenv = SqlReviewEnv.from_docker_image("sql_review_env-env:latest")
+SQL review is a practical and high-value task for real software teams. Query mistakes can cause:
+- incorrect business metrics
+- data leaks or SQL injection vulnerabilities
+- poor database performance and expensive queries
 
-    # Reset
-    result = sql_review_envenv.reset()
-    print(f"Reset: {result.observation.echoed_message}")
+This environment provides a reproducible way to evaluate whether an agent can reason about SQL correctness, security, and efficiency across multiple difficulty levels.
 
-    # Send multiple messages
-    messages = ["Hello, World!", "Testing echo", "Final message"]
+## Environment Overview
 
-    for msg in messages:
-        result = sql_review_envenv.step(SqlReviewAction(message=msg))
-        print(f"Sent: '{msg}'")
-        print(f"  → Echoed: '{result.observation.echoed_message}'")
-        print(f"  → Length: {result.observation.message_length}")
-        print(f"  → Reward: {result.reward}")
+The environment serves SQL review tasks across three difficulty bands:
+- `easy`: correctness fixes
+- `medium`: security remediation
+- `hard`: performance optimization
 
-finally:
-    # Always clean up
-    sql_review_envenv.close()
-```
+Each episode gives the agent a task description, a buggy SQL query, schema context, and feedback from the previous attempt. The agent has up to 3 steps to improve its answer.
 
-That's it! The `SqlReviewEnv.from_docker_image()` method handles:
-- Starting the Docker container
-- Waiting for the server to be ready
-- Connecting to the environment
-- Container cleanup when you call `close()`
+## Action Space
 
-## Building the Docker Image
-
-Before using the environment, you need to build the Docker image:
-
-```bash
-# From project root
-docker build -t sql_review_env-env:latest -f server/Dockerfile .
-```
-
-## Deploying to Hugging Face Spaces
-
-You can easily deploy your OpenEnv environment to Hugging Face Spaces using the `openenv push` command:
-
-```bash
-# From the environment directory (where openenv.yaml is located)
-openenv push
-
-# Or specify options
-openenv push --namespace my-org --private
-```
-
-The `openenv push` command will:
-1. Validate that the directory is an OpenEnv environment (checks for `openenv.yaml`)
-2. Prepare a custom build for Hugging Face Docker space (enables web interface)
-3. Upload to Hugging Face (ensuring you're logged in)
-
-### Prerequisites
-
-- Authenticate with Hugging Face: The command will prompt for login if not already authenticated
-
-### Options
-
-- `--directory`, `-d`: Directory containing the OpenEnv environment (defaults to current directory)
-- `--repo-id`, `-r`: Repository ID in format 'username/repo-name' (defaults to 'username/env-name' from openenv.yaml)
-- `--base-image`, `-b`: Base Docker image to use (overrides Dockerfile FROM)
-- `--private`: Deploy the space as private (default: public)
-
-### Examples
-
-```bash
-# Push to your personal namespace (defaults to username/env-name from openenv.yaml)
-openenv push
-
-# Push to a specific repository
-openenv push --repo-id my-org/my-env
-
-# Push with a custom base image
-openenv push --base-image ghcr.io/meta-pytorch/openenv-base:latest
-
-# Push as a private space
-openenv push --private
-
-# Combine options
-openenv push --repo-id my-org/my-env --base-image custom-base:latest --private
-```
-
-After deployment, your space will be available at:
-`https://huggingface.co/spaces/<repo-id>`
-
-The deployed space includes:
-- **Web Interface** at `/web` - Interactive UI for exploring the environment
-- **API Documentation** at `/docs` - Full OpenAPI/Swagger interface
-- **Health Check** at `/health` - Container health monitoring
-- **WebSocket** at `/ws` - Persistent session endpoint for low-latency interactions
-
-## Environment Details
-
-### Action
-**SqlReviewAction**: Contains a single field
-- `message` (str) - The message to echo back
-
-### Observation
-**SqlReviewObservation**: Contains the echo response and metadata
-- `echoed_message` (str) - The message echoed back
-- `message_length` (int) - Length of the message
-- `reward` (float) - Reward based on message length (length × 0.1)
-- `done` (bool) - Always False for echo environment
-- `metadata` (dict) - Additional info like step count
-
-### Reward
-The reward is calculated as: `message_length × 0.1`
-- "Hi" → reward: 0.2
-- "Hello, World!" → reward: 1.3
-- Empty message → reward: 0.0
-
-## Advanced Usage
-
-### Connecting to an Existing Server
-
-If you already have a Sql Review Env environment server running, you can connect directly:
+The agent submits a `SqlReviewAction`:
 
 ```python
-from sql_review_env import SqlReviewEnv
-
-# Connect to existing server
-sql_review_envenv = SqlReviewEnv(base_url="<ENV_HTTP_URL_HERE>")
-
-# Use as normal
-result = sql_review_envenv.reset()
-result = sql_review_envenv.step(SqlReviewAction(message="Hello!"))
+class SqlReviewAction(Action):
+    sql: str
+    explanation: Optional[str]
 ```
 
-Note: When connecting to an existing server, `sql_review_envenv.close()` will NOT stop the server.
+Fields:
+- `sql`: the corrected, secured, or optimized SQL query
+- `explanation`: optional natural-language explanation of the fix
 
-### Using the Context Manager
+## Observation Space
 
-The client supports context manager usage for automatic connection management:
+The environment returns a `SqlReviewObservation`:
 
 ```python
-from sql_review_env import SqlReviewAction, SqlReviewEnv
-
-# Connect with context manager (auto-connects and closes)
-with SqlReviewEnv(base_url="http://localhost:8000") as env:
-    result = env.reset()
-    print(f"Reset: {result.observation.echoed_message}")
-    # Multiple steps with low latency
-    for msg in ["Hello", "World", "!"]:
-        result = env.step(SqlReviewAction(message=msg))
-        print(f"Echoed: {result.observation.echoed_message}")
+class SqlReviewObservation(Observation):
+    task_id: str
+    difficulty: str
+    description: str
+    sql_to_review: str
+    schema_summary: str
+    step_number: int
+    last_feedback: Optional[str]
+    done: bool
+    reward: float
 ```
 
-The client uses WebSocket connections for:
-- **Lower latency**: No HTTP connection overhead per request
-- **Persistent session**: Server maintains your environment state
-- **Efficient for episodes**: Better for many sequential steps
+Fields:
+- `task_id`: unique task identifier
+- `difficulty`: `easy`, `medium`, or `hard`
+- `description`: natural-language objective for the agent
+- `sql_to_review`: SQL query that needs review or repair
+- `schema_summary`: summary of the e-commerce schema
+- `step_number`: current step within the episode
+- `last_feedback`: grader feedback from the previous attempt
+- `done`: whether the episode is finished
+- `reward`: scalar score for the latest attempt
 
-### Concurrent WebSocket Sessions
+## State
 
-The server supports multiple concurrent WebSocket connections. To enable this,
-modify `server/app.py` to use factory mode:
+The environment maintains standard OpenEnv state along with the selected task and latest feedback. The environment resets cleanly between episodes.
 
-```python
-# In server/app.py - use factory mode for concurrent sessions
-app = create_app(
-    SqlReviewEnvironment,  # Pass class, not instance
-    SqlReviewAction,
-    SqlReviewObservation,
-    max_concurrent_envs=4,  # Allow 4 concurrent sessions
-)
-```
+## Task Set
 
-Then multiple clients can connect simultaneously:
+The environment currently includes 9 tasks.
 
-```python
-from sql_review_env import SqlReviewAction, SqlReviewEnv
-from concurrent.futures import ThreadPoolExecutor
+### Easy: correctness fixes
 
-def run_episode(client_id: int):
-    with SqlReviewEnv(base_url="http://localhost:8000") as env:
-        result = env.reset()
-        for i in range(10):
-            result = env.step(SqlReviewAction(message=f"Client {client_id}, step {i}"))
-        return client_id, result.observation.message_length
+These tasks require the agent to fix buggy SQL while preserving the intended result set.
 
-# Run 4 episodes concurrently
-with ThreadPoolExecutor(max_workers=4) as executor:
-    results = list(executor.map(run_episode, range(4)))
-```
+Examples:
+- `easy_wrong_join`
+- `easy_missing_filter`
+- `easy_wrong_aggregate`
 
-## Development & Testing
+### Medium: security remediation
 
-### Direct Environment Testing
+These tasks require the agent to remove insecure query patterns and replace them with safer SQL.
 
-Test the environment logic directly without starting the HTTP server:
+Examples:
+- `medium_sql_injection`
+- `medium_data_exposure`
+- `medium_over_privilege`
 
-```bash
-# From the server directory
-python3 server/sql_review_env_environment.py
-```
+### Hard: performance optimization
 
-This verifies that:
-- Environment resets correctly
-- Step executes actions properly
-- State tracking works
-- Rewards are calculated correctly
+These tasks require the agent to rewrite inefficient SQL into equivalent but more efficient forms.
 
-### Running Locally
+Examples:
+- `hard_correlated_subquery`
+- `hard_function_on_column`
+- `hard_n_plus_one`
 
-Run the server locally for development:
+## Reward and Grading
 
-```bash
-uvicorn server.app:app --reload
-```
+All tasks are graded deterministically and return scores in the range `0.0` to `1.0`.
+
+### Easy tasks
+
+Easy tasks use result-set grading:
+- `1.0`: exact match with the reference result set
+- `0.6`: partial match with strong overlap
+- `0.3`: query runs but is incorrect
+- `0.0`: empty or invalid submission
+
+### Medium tasks
+
+Medium tasks use a security grader combining:
+- vulnerability removal
+- presence of required safe patterns
+- SQL syntax validity
+
+This produces partial credit and rewards safer rewrites even when the answer is not perfect.
+
+### Hard tasks
+
+Hard tasks use a performance grader combining:
+- correctness against the reference result set
+- query-plan improvement using `EXPLAIN QUERY PLAN`
+- explanation quality via SQL comments
+
+This encourages agents to produce both correct and meaningfully optimized SQL.
+
+## Episode Flow
+
+1. Call `reset()` to receive a task.
+2. Inspect the observation.
+3. Submit a `SqlReviewAction` through `step()`.
+4. Receive updated observation, reward, and feedback.
+5. Continue until the task is solved or the maximum number of steps is reached.
+
+Episodes terminate when:
+- the score is high enough for success
+- the maximum step limit is reached
 
 ## Project Structure
 
-```
+```text
 sql_review_env/
-├── .dockerignore         # Docker build exclusions
-├── __init__.py            # Module exports
-├── README.md              # This file
-├── openenv.yaml           # OpenEnv manifest
-├── pyproject.toml         # Project metadata and dependencies
-├── uv.lock                # Locked dependencies (generated)
-├── client.py              # SqlReviewEnv client
-├── models.py              # Action and Observation models
+├── __init__.py
+├── client.py
+├── inference.py
+├── models.py
+├── openenv.yaml
+├── pyproject.toml
+├── README.md
 └── server/
-    ├── __init__.py        # Server module exports
-    ├── sql_review_env_environment.py  # Core environment logic
-    ├── app.py             # FastAPI application (HTTP + WebSocket endpoints)
-    └── Dockerfile         # Container image definition
+    ├── __init__.py
+    ├── app.py
+    ├── Dockerfile
+    ├── graders.py
+    ├── meta_environment.py
+    ├── schema.sql
+    └── tasks.py
 ```
+
+## Running Locally
+
+### Start the API server
+
+From the project directory:
+
+```bash
+uvicorn server.app:app --host 0.0.0.0 --port 7860
+```
+
+### Example client usage
+
+```python
+from sql_review_env import SqlReviewEnv, SqlReviewAction
+
+with SqlReviewEnv(base_url="http://localhost:7860").sync() as env:
+    result = env.reset()
+    print(result.observation.task_id)
+    print(result.observation.description)
+    print(result.observation.sql_to_review)
+
+    result = env.step(
+        SqlReviewAction(
+            sql="SELECT ...",
+            explanation="Fixed join condition and filtering",
+        )
+    )
+    print(result.observation.last_feedback)
+    print(result.reward)
+```
+
+## Docker
+
+### Build the container
+
+```bash
+docker build -t sql_review_env-env:latest -f server/Dockerfile .
+```
+
+### Run the container
+
+```bash
+docker run --rm -p 7860:7860 sql_review_env-env:latest
+```
+
+After startup, the environment should be available on:
+- `/`
+- `/health`
+- `/docs`
+- `/openapi.json`
+- `/ws`
+
+## Hugging Face Spaces
+
+This environment is deployed as a Docker-based Hugging Face Space tagged with `openenv`.
+
+The Space runs the FastAPI server and exposes the OpenEnv endpoints over HTTP and WebSocket.
+
+## Baseline Inference Script
+
+The submission includes a baseline agent runner in `inference.py`.
+
+Required environment variables:
+- `API_BASE_URL`: LLM API endpoint
+- `MODEL_NAME`: model identifier
+- `HF_TOKEN`: API token for model access
+
+Recommended compatibility:
+- support `OPENAI_API_KEY` as an alternative credential if needed
+
+Run the baseline:
+
+```bash
+python inference.py
+```
+
+Expected behavior:
+- connects to the deployed environment
+- runs the model over all tasks
+- records per-task scores
+- writes a reproducible summary to `baseline_scores.json`
+
+## OpenEnv Compliance
+
+This environment includes:
+- typed action and observation models
+- `reset()`, `step()`, and `state()` semantics
+- `openenv.yaml`
+- deterministic task graders
+- Dockerized deployment for Hugging Face Spaces
+
+Before submission, validate the environment with:
+
+```bash
+openenv validate
+```
+
+## Notes for Evaluation
+
+This environment is intended to evaluate whether agents can:
+- understand SQL semantics
+- preserve correctness while fixing bugs
+- identify unsafe query patterns
+- optimize query structure without changing behavior
+- improve incrementally based on grader feedback
