@@ -6,19 +6,20 @@
 
 """FastAPI application for the SQL Review Environment."""
 
+"""FastAPI application for the SQL Review Environment."""
+
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 try:
     from openenv.core.env_server.http_server import create_app
 except Exception as e:
-    raise ImportError(
-        "openenv is required. Install with: pip install openenv-core"
-    ) from e
+    raise ImportError(f"openenv is required: {e}") from e
 
-try:
-    from models import SqlReviewAction, SqlReviewObservation
-    from server.meta_environment import SqlReviewEnvironment
-except ModuleNotFoundError:
-    from ..models import SqlReviewAction, SqlReviewObservation
-    from .meta_environment import SqlReviewEnvironment
+from models import SqlReviewAction, SqlReviewObservation
+from server.meta_environment import SqlReviewEnvironment
 
 app = create_app(
     SqlReviewEnvironment,
@@ -33,15 +34,14 @@ async def root():
     from fastapi.responses import JSONResponse
     return JSONResponse({"status": "healthy", "name": "sql_review_env"})
 
+@app.get("/health")
+async def health():
+    from fastapi.responses import JSONResponse
+    return JSONResponse({"status": "healthy"})
 
 def main(host: str = "0.0.0.0", port: int = 7860):
     import uvicorn
     uvicorn.run(app, host=host, port=port)
 
-
 if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, default=7860)
-    args = parser.parse_args()
-    main(port=args.port)
+    main()
