@@ -7,8 +7,9 @@ Mandatory environment variables:
   HF_TOKEN       Your Hugging Face API key
 """
 
-import os
 import json
+import os
+import pathlib
 import time
 import textwrap
 from typing import Optional
@@ -18,13 +19,18 @@ from openai import OpenAI
 
 # ── Mandatory env vars ────────────────────────────────────────────
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
-API_KEY      = os.getenv("HF_TOKEN") or os.getenv("API_KEY", "")
-MODEL_NAME   = os.getenv("MODEL_NAME", "meta-llama/Llama-3.3-70B-Instruct")
+API_KEY = (
+    os.getenv("HF_TOKEN")
+    or os.getenv("OPENAI_API_KEY")
+    or os.getenv("API_KEY", "")
+)
+MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Llama-3.3-70B-Instruct")
 ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:7860")
 
 MAX_STEPS   = 3
 TEMPERATURE = 0.1
 MAX_TOKENS  = 1024
+OUTPUT_PATH = pathlib.Path(__file__).with_name("baseline_scores.json")
 
 ALL_TASK_IDS = [
     "easy_wrong_join",
@@ -122,11 +128,11 @@ def run_task(client: OpenAI, task_id: str) -> float:
             print(f"    Step {step_num}: empty LLM response, skipping")
             break
 
-        step_resp   = env_post("/step", {"action": {"sql": agent_sql}})
-        reward_val  = step_resp["reward"]["value"]
-        feedback    = step_resp["reward"]["feedback"]
-        done        = step_resp["done"]
+        step_resp = env_post("/step", {"action": {"sql": agent_sql}})
+        reward_val = float(step_resp.get("reward", 0.0))
         observation = step_resp["observation"]
+        feedback = observation.get("last_feedback")
+        done = step_resp.get("done", observation.get("done", False))
 
         best_score = max(best_score, reward_val)
         print(f"    Step {step_num}: score={reward_val:.3f}  done={done}")
@@ -143,6 +149,13 @@ def run_task(client: OpenAI, task_id: str) -> float:
 # ── Main ──────────────────────────────────────────────────────────
 
 def main() -> None:
+    if not API_KEY:
+        raise SystemExit(
+            "Missing API key. Set HF_TOKEN, OPENAI_API_KEY, or API_KEY."
+        )
+    if not MODEL_NAME:
+        raise SystemExit("Missing MODEL_NAME environment variable.")
+
     print("=" * 60)
     print("SQL Review OpenEnv  -  Baseline Inference")
     print(f"Model:   {MODEL_NAME}")
@@ -193,9 +206,9 @@ def main() -> None:
             "overall_mean": round(overall, 3),
         },
     }
-    with open("baseline_scores.json", "w") as f:
+    with OUTPUT_PATH.open("w", encoding="utf-8") as f:
         json.dump(output, f, indent=2)
-    print("\nScores saved to baseline_scores.json")
+    print(f"\nScores saved to {OUTPUT_PATH.name}")
 
 
 if __name__ == "__main__":
