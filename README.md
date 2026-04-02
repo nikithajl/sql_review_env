@@ -85,7 +85,14 @@ Fields:
 
 ## State
 
-The environment maintains standard OpenEnv state along with the selected task and latest feedback. The environment resets cleanly between episodes.
+The environment exposes episode state through a typed state model that includes:
+- `episode_id`
+- `step_count`
+- `current_task_id`
+- `current_difficulty`
+- `last_feedback`
+
+The environment resets cleanly between episodes.
 
 ## Task Set
 
