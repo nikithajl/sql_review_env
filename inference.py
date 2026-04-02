@@ -17,7 +17,6 @@ from typing import Optional
 import requests
 from openai import OpenAI
 
-# ── Mandatory env vars ────────────────────────────────────────────
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 API_KEY = (
     os.getenv("HF_TOKEN")
@@ -27,9 +26,9 @@ API_KEY = (
 MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Llama-3.3-70B-Instruct")
 ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:7860")
 
-MAX_STEPS   = 3
+MAX_STEPS = 3
 TEMPERATURE = 0.0
-MAX_TOKENS  = 1024
+MAX_TOKENS = 1024
 OUTPUT_PATH = pathlib.Path(__file__).with_name("baseline_scores.json")
 
 ALL_TASK_IDS = [
@@ -44,7 +43,8 @@ ALL_TASK_IDS = [
     "hard_n_plus_one",
 ]
 
-SYSTEM_PROMPT = textwrap.dedent("""
+SYSTEM_PROMPT = textwrap.dedent(
+    """
     You are an expert SQL code reviewer and database engineer.
     You will be given a SQL query that has a problem: it may have a bug,
     a security vulnerability, or a performance issue.
@@ -52,14 +52,13 @@ SYSTEM_PROMPT = textwrap.dedent("""
     and a summary of the database schema.
 
     Your job is to return ONLY the corrected SQL query.
-    No markdown, no code fences, no explanations outside SQL comments (--)
+    No markdown, no code fences, no explanations outside SQL comments (--).
     For performance tasks: add a brief SQL comment (--) explaining the fix.
     For security tasks: use ? placeholders for any user-supplied values.
     Return the SQL and nothing else.
-""").strip()
+    """
+).strip()
 
-
-# ── HTTP helpers ──────────────────────────────────────────────────
 
 def env_post(path: str, body: dict) -> dict:
     resp = requests.post(f"{ENV_BASE_URL}{path}", json=body, timeout=30)
@@ -73,15 +72,13 @@ def env_get(path: str) -> dict:
     return resp.json()
 
 
-# ── LLM call ─────────────────────────────────────────────────────
-
 def call_llm(client: OpenAI, user_prompt: str) -> str:
     try:
         completion = client.chat.completions.create(
             model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user",   "content": user_prompt},
+                {"role": "user", "content": user_prompt},
             ],
             temperature=TEMPERATURE,
             max_tokens=MAX_TOKENS,
@@ -109,15 +106,13 @@ def build_prompt(observation: dict, feedback: Optional[str]) -> str:
     return "\n".join(parts)
 
 
-# ── Per-task episode runner ───────────────────────────────────────
-
 def run_task(client: OpenAI, task_id: str) -> float:
     print(f"\n  Task: {task_id}")
 
-    reset_resp  = env_post("/reset", {"task_id": task_id})
+    reset_resp = env_post("/reset", {"task_id": task_id})
     observation = reset_resp["observation"]
     feedback: Optional[str] = None
-    best_score  = 0.0
+    best_score = 0.0
 
     for step_num in range(1, MAX_STEPS + 1):
         if observation.get("done"):
@@ -128,7 +123,16 @@ def run_task(client: OpenAI, task_id: str) -> float:
             print(f"    Step {step_num}: empty LLM response, skipping")
             break
 
-        step_resp = env_post("/step", {"action": {"sql": agent_sql}})
+        step_resp = env_post(
+            "/step",
+            {
+                "action": {
+                    "sql": agent_sql,
+                    "explanation": None,
+                },
+                "task_id": task_id,
+            },
+        )
         reward_val = float(step_resp.get("reward", 0.0))
         observation = step_resp["observation"]
         feedback = observation.get("last_feedback")
@@ -145,8 +149,6 @@ def run_task(client: OpenAI, task_id: str) -> float:
 
     return best_score
 
-
-# ── Main ──────────────────────────────────────────────────────────
 
 def main() -> None:
     if not API_KEY:
@@ -165,32 +167,31 @@ def main() -> None:
     try:
         health = env_get("/health")
         print(f"Environment health: {health}\n")
-    except Exception as e:
-        print(f"ERROR: Cannot reach environment at {ENV_BASE_URL}: {e}")
+    except Exception as exc:
+        print(f"ERROR: Cannot reach environment at {ENV_BASE_URL}: {exc}")
         raise SystemExit(1)
 
-    client  = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
     results: dict[str, float] = {}
 
     for task_id in ALL_TASK_IDS:
         results[task_id] = run_task(client, task_id)
 
-    # ── Summary ───────────────────────────────────────────────────
     print("\n" + "=" * 60)
     print("RESULTS SUMMARY")
     print("=" * 60)
 
-    easy_scores   = [v for k, v in results.items() if k.startswith("easy")]
+    easy_scores = [v for k, v in results.items() if k.startswith("easy")]
     medium_scores = [v for k, v in results.items() if k.startswith("medium")]
-    hard_scores   = [v for k, v in results.items() if k.startswith("hard")]
+    hard_scores = [v for k, v in results.items() if k.startswith("hard")]
 
     for task_id, score in results.items():
         print(f"  {task_id:<35} {score:.3f}")
 
     print("-" * 60)
-    print(f"  Easy   mean:  {sum(easy_scores)   / len(easy_scores):.3f}")
+    print(f"  Easy   mean:  {sum(easy_scores) / len(easy_scores):.3f}")
     print(f"  Medium mean:  {sum(medium_scores) / len(medium_scores):.3f}")
-    print(f"  Hard   mean:  {sum(hard_scores)   / len(hard_scores):.3f}")
+    print(f"  Hard   mean:  {sum(hard_scores) / len(hard_scores):.3f}")
     print("-" * 60)
     overall = sum(results.values()) / len(results)
     print(f"  OVERALL mean: {overall:.3f}")
@@ -200,9 +201,9 @@ def main() -> None:
         "model": MODEL_NAME,
         "scores": results,
         "summary": {
-            "easy_mean":    round(sum(easy_scores)   / len(easy_scores),   3),
-            "medium_mean":  round(sum(medium_scores) / len(medium_scores), 3),
-            "hard_mean":    round(sum(hard_scores)   / len(hard_scores),   3),
+            "easy_mean": round(sum(easy_scores) / len(easy_scores), 3),
+            "medium_mean": round(sum(medium_scores) / len(medium_scores), 3),
+            "hard_mean": round(sum(hard_scores) / len(hard_scores), 3),
             "overall_mean": round(overall, 3),
         },
     }
