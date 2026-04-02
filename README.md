@@ -1,6 +1,5 @@
 ---
 title: SQL Review OpenEnv
-emoji: "🧠"
 colorFrom: blue
 colorTo: gray
 sdk: docker
