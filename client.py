@@ -22,12 +22,12 @@ class SqlReviewEnv(
     Client for the SQL Review Environment.
 
     Example (sync):
-        >>> with SqlReviewEnv(base_url="http://localhost:8000").sync() as client:
+        >>> with SqlReviewEnv(base_url="http://localhost:7860").sync() as client:
         ...     result = client.reset()
         ...     result = client.step(SqlReviewAction(sql="SELECT ..."))
 
     Example (async):
-        >>> async with SqlReviewEnv(base_url="http://localhost:8000") as client:
+        >>> async with SqlReviewEnv(base_url="http://localhost:7860") as client:
         ...     result = await client.reset()
         ...     result = await client.step(SqlReviewAction(sql="SELECT ..."))
     """
