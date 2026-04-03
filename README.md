@@ -84,14 +84,12 @@ Fields:
 
 ## State
 
-The environment exposes episode state through a typed state model that includes:
+The environment exposes the standard OpenEnv state object through `/state`, including:
 - `episode_id`
 - `step_count`
-- `current_task_id`
-- `current_difficulty`
-- `last_feedback`
 
-The environment resets cleanly between episodes.
+Task-specific context such as the selected task, difficulty, and latest feedback is returned in observations from `/reset` and `/step`.
+
 
 ## Task Set
 
