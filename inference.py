@@ -93,8 +93,8 @@ def call_llm(client: OpenAI, user_prompt: str) -> str:
         )
         return (completion.choices[0].message.content or "").strip()
     except Exception as exc:
-        print(f"    [LLM ERROR] {exc}")
-        return ""
+        raise RuntimeError(f"LLM request failed: {exc}") from exc
+
 
 
 def build_prompt(observation: dict, feedback: Optional[str]) -> str:
@@ -128,9 +128,10 @@ def run_task(client: OpenAI, task_id: str) -> float:
             break
 
         agent_sql = call_llm(client, build_prompt(observation, feedback))
-        if not agent_sql:
-            print(f"    Step {step_num}: empty LLM response, skipping")
-            break
+        if not agent_sql.strip():
+            raise RuntimeError(
+                f"LLM returned an empty response for task '{task_id}' at step {step_num}."
+            )
 
         step_resp = env_post(
             "/step",
@@ -186,7 +187,12 @@ def main() -> None:
     results: dict[str, float] = {}
 
     for task_id in ALL_TASK_IDS:
-        results[task_id] = run_task(client, task_id)
+        try:
+            results[task_id] = run_task(client, task_id)
+        except Exception as exc:
+            raise SystemExit(
+                f"Baseline failed on task '{task_id}': {exc}"
+            ) from exc
 
     print("\n" + "=" * 60)
     print("RESULTS SUMMARY")
@@ -207,6 +213,11 @@ def main() -> None:
     overall = sum(results.values()) / len(results)
     print(f"  OVERALL mean: {overall:.3f}")
     print("=" * 60)
+
+    if all(score == 0.0 for score in results.values()):
+        raise SystemExit(
+            "Baseline run produced all-zero scores. Check model credentials and provider access."
+        )
 
     output = {
         "model": MODEL_NAME,
