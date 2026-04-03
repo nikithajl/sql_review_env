@@ -13,6 +13,17 @@ from openenv.core.env_server.types import State as OpenEnvState
 from pydantic import BaseModel, Field
 
 
+class SqlReviewReward(BaseModel):
+    """Structured reward details used by graders and the environment."""
+
+    score: float = Field(..., ge=0.0, le=1.0, description="Reward score from 0.0 to 1.0")
+    feedback: str = Field(..., description="Human-readable feedback for the latest step")
+    breakdown: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Deterministic grader details for debugging and analysis",
+    )
+
+
 class SqlReviewAction(Action):
     """Action: a corrected SQL query submitted by the agent."""
 
@@ -36,16 +47,9 @@ class SqlReviewObservation(Observation):
     last_feedback: Optional[str] = Field(
         default=None, description="Feedback from previous step"
     )
-
-
-class SqlReviewReward(BaseModel):
-    """Structured reward details used by graders and the environment."""
-
-    score: float = Field(..., ge=0.0, le=1.0, description="Reward score from 0.0 to 1.0")
-    feedback: str = Field(..., description="Human-readable feedback for the latest step")
-    breakdown: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Deterministic grader details for debugging and analysis",
+    reward_info: Optional[SqlReviewReward] = Field(
+        default=None,
+        description="Structured reward details for the latest step",
     )
 
 
@@ -61,3 +65,4 @@ class SqlReviewState(OpenEnvState):
     last_feedback: Optional[str] = Field(
         default=None, description="Latest grader feedback for the episode"
     )
+
