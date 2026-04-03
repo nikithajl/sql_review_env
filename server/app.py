@@ -28,6 +28,61 @@ app = create_app(
     max_concurrent_envs=10,
 )
 
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    from fastapi.openapi.utils import get_openapi
+
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+
+    schemas = openapi_schema.get("components", {}).get("schemas", {})
+
+    if "ResetRequest" in schemas:
+        schemas["ResetRequest"]["example"] = {
+            "task_id": "easy_wrong_join"
+        }
+
+    if "StepRequest" in schemas:
+        schemas["StepRequest"]["example"] = {
+            "action": {
+                "sql": "SELECT u.name, u.email, COUNT(o.id) AS order_count FROM users u INNER JOIN orders o ON o.user_id = u.id WHERE u.is_active = 1 GROUP BY u.id ORDER BY u.name;",
+                "explanation": "Fixed the join condition."
+            },
+            "task_id": "easy_wrong_join"
+        }
+
+    paths = openapi_schema.get("paths", {})
+
+    if "/reset" in paths and "post" in paths["/reset"]:
+        content = paths["/reset"]["post"].get("requestBody", {}).get("content", {})
+        if "application/json" in content:
+            content["application/json"]["example"] = {
+                "task_id": "easy_wrong_join"
+            }
+
+    if "/step" in paths and "post" in paths["/step"]:
+        content = paths["/step"]["post"].get("requestBody", {}).get("content", {})
+        if "application/json" in content:
+            content["application/json"]["example"] = {
+                "action": {
+                    "sql": "SELECT u.name, u.email, COUNT(o.id) AS order_count FROM users u INNER JOIN orders o ON o.user_id = u.id WHERE u.is_active = 1 GROUP BY u.id ORDER BY u.name;",
+                    "explanation": "Fixed the join condition."
+                },
+                "task_id": "easy_wrong_join"
+            }
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi
+
 @app.get("/")
 async def root():
     from fastapi.responses import JSONResponse
