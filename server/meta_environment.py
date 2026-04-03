@@ -92,6 +92,7 @@ class SqlReviewEnvironment(Environment):
             last_feedback=None,
             done=False,
             reward=0.0,
+            reward_info=None,
         )
 
     def step(
@@ -149,6 +150,7 @@ class SqlReviewEnvironment(Environment):
             last_feedback=reward_details.feedback,
             done=done,
             reward=reward_details.score,
+            reward_info=reward_details,
             metadata={"reward": reward_details.model_dump()},
         )
 
