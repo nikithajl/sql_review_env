@@ -1,0 +1,20 @@
+{
+  "model": "meta-llama/Llama-3.3-70B-Instruct",
+  "scores": {
+    "easy_wrong_join": 1.0,
+    "easy_missing_filter": 1.0,
+    "easy_wrong_aggregate": 1.0,
+    "medium_sql_injection": 1.0,
+    "medium_data_exposure": 1.0,
+    "medium_over_privilege": 1.0,
+    "hard_correlated_subquery": 0.533,
+    "hard_function_on_column": 0.6,
+    "hard_n_plus_one": 0.9
+  },
+  "summary": {
+    "easy_mean": 1.0,
+    "medium_mean": 1.0,
+    "hard_mean": 0.678,
+    "overall_mean": 0.893
+  }
+}
