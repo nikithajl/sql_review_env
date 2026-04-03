@@ -1,5 +1,6 @@
 ---
 title: SQL Review OpenEnv
+emoji: "🧠"
 colorFrom: blue
 colorTo: gray
 sdk: docker
@@ -67,6 +68,7 @@ class SqlReviewObservation(Observation):
     schema_summary: str
     step_number: int
     last_feedback: Optional[str]
+    reward_info: Optional[SqlReviewReward]
     done: bool
     reward: float
 ```
@@ -79,8 +81,10 @@ Fields:
 - `schema_summary`: summary of the e-commerce schema
 - `step_number`: current step within the episode
 - `last_feedback`: grader feedback from the previous attempt
+- `reward_info`: structured reward details including score, feedback, and grader breakdown
 - `done`: whether the episode is finished
 - `reward`: scalar score for the latest attempt
+
 
 ## State
 
