@@ -168,6 +168,28 @@ Episodes terminate when:
 - the score is high enough for success
 - the maximum step limit is reached
 
+## API Usage Example
+
+Reset to a specific task:
+
+```json
+{
+  "task_id": "easy_wrong_join"
+}
+```
+
+Step on that task:
+
+```json
+{
+  "action": {
+    "sql": "SELECT u.name, u.email, COUNT(o.id) AS order_count FROM users u INNER JOIN orders o ON o.user_id = u.id WHERE u.is_active = 1 GROUP BY u.id ORDER BY u.name;",
+    "explanation": "Fixed the join condition."
+  },
+  "task_id": "easy_wrong_join"
+}
+```
+
 ## Project Structure
 
 ```text
