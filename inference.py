@@ -72,6 +72,13 @@ def env_get(path: str) -> dict:
     return resp.json()
 
 
+def require_keys(payload: dict, keys: list[str], context: str) -> None:
+    missing = [key for key in keys if key not in payload]
+    if missing:
+        raise RuntimeError(f"{context} missing keys: {missing}. Payload: {payload}")
+
+
+
 def call_llm(client: OpenAI, user_prompt: str) -> str:
     try:
         completion = client.chat.completions.create(
@@ -110,9 +117,11 @@ def run_task(client: OpenAI, task_id: str) -> float:
     print(f"\n  Task: {task_id}")
 
     reset_resp = env_post("/reset", {"task_id": task_id})
+    require_keys(reset_resp, ["observation", "done"], "reset response")
     observation = reset_resp["observation"]
     feedback: Optional[str] = None
     best_score = 0.0
+
 
     for step_num in range(1, MAX_STEPS + 1):
         if observation.get("done"):
@@ -133,10 +142,12 @@ def run_task(client: OpenAI, task_id: str) -> float:
                 "task_id": task_id,
             },
         )
+        require_keys(step_resp, ["observation", "reward", "done"], "step response")
         reward_val = float(step_resp.get("reward", 0.0))
         observation = step_resp["observation"]
         feedback = observation.get("last_feedback")
         done = step_resp.get("done", observation.get("done", False))
+
 
         best_score = max(best_score, reward_val)
         print(f"    Step {step_num}: score={reward_val:.3f}  done={done}")
