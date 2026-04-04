@@ -85,14 +85,21 @@ class SqlReviewEnvironment(Environment):
         return SqlReviewObservation(
             task_id=self._current_task["id"],
             difficulty=self._current_task["difficulty"],
+            task_type=self._current_task["grader_type"],
             description=self._current_task["description"],
             sql_to_review=self._current_task["buggy_sql"],
             schema_summary=SCHEMA_SUMMARY,
             step_number=0,
+            steps_remaining=MAX_STEPS,
+            success_threshold=0.9,
             last_feedback=None,
             done=False,
             reward=0.0,
             reward_info=None,
+            metadata={
+                "task_category": self._current_task["grader_type"],
+                "max_steps": MAX_STEPS,
+            },
         )
 
     def step(
@@ -143,15 +150,22 @@ class SqlReviewEnvironment(Environment):
         return SqlReviewObservation(
             task_id=self._current_task["id"],
             difficulty=self._current_task["difficulty"],
+            task_type=self._current_task["grader_type"],
             description=self._current_task["description"],
             sql_to_review=self._current_task["buggy_sql"],
             schema_summary=SCHEMA_SUMMARY,
             step_number=self._state.step_count,
+            steps_remaining=max(0, MAX_STEPS - self._state.step_count),
+            success_threshold=0.9,
             last_feedback=reward_details.feedback,
             done=done,
             reward=reward_details.score,
             reward_info=reward_details,
-            metadata={"reward": reward_details.model_dump()},
+            metadata={
+                "task_category": self._current_task["grader_type"],
+                "max_steps": MAX_STEPS,
+                "reward": reward_details.model_dump(),
+            },
         )
 
     @property
