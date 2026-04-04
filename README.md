@@ -203,7 +203,6 @@ Step on that task:
 ```
 
 Security task example:
-
 ```json
 {
   "action": {
