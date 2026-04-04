@@ -282,14 +282,13 @@ Performance task example:
 ```text
 sql_review_env/
 ├── __init__.py
-├── baseline_scores.json
 ├── client.py
 ├── inference.py
 ├── models.py
 ├── openenv.yaml
 ├── pyproject.toml
 ├── README.md
-├── uv.lock
+├── smoke_test.py
 └── server/
     ├── __init__.py
     ├── app.py
