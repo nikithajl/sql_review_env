@@ -38,12 +38,24 @@ class SqlReviewObservation(Observation):
 
     task_id: str = Field(default="", description="Unique task identifier")
     difficulty: str = Field(default="", description="easy | medium | hard")
+    task_type: str = Field(
+        default="",
+        description="High-level task type: result_set, security, or performance",
+    )
     description: str = Field(default="", description="Natural language task description")
     sql_to_review: str = Field(
         default="", description="The SQL query to fix/audit/optimize"
     )
     schema_summary: str = Field(default="", description="Database schema description")
     step_number: int = Field(default=0, description="Current step in the episode")
+    steps_remaining: int = Field(
+        default=0,
+        description="Number of attempts remaining in the current episode",
+    )
+    success_threshold: float = Field(
+        default=0.9,
+        description="Reward threshold at which the episode is considered solved",
+    )
     last_feedback: Optional[str] = Field(
         default=None, description="Feedback from previous step"
     )
