@@ -8,13 +8,13 @@
     "medium_data_exposure": 1.0,
     "medium_over_privilege": 0.979,
     "hard_correlated_subquery": 0.742,
-    "hard_function_on_column": 0.82,
-    "hard_n_plus_one": 0.944
+    "hard_function_on_column": 0.86,
+    "hard_n_plus_one": 0.969
   },
   "summary": {
     "easy_mean": 1.0,
     "medium_mean": 0.993,
-    "hard_mean": 0.835,
-    "overall_mean": 0.943
+    "hard_mean": 0.857,
+    "overall_mean": 0.95
   }
 }
