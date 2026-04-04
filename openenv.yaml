@@ -42,11 +42,18 @@ tasks:
 observation_space:
   task_id: string
   difficulty: string
+  task_type: string
   description: string
   sql_to_review: string
   schema_summary: string
   step_number: integer
+  steps_remaining: integer
+  success_threshold: float
   last_feedback: string|null
+  reward_info:
+    score: float
+    feedback: string
+    breakdown: object|null
 
 action_space:
   sql: string
