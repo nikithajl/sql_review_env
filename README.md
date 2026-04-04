@@ -196,8 +196,6 @@ This rewards agents that preserve semantics while also removing the actual perfo
 
 This environment is difficult for agents because it tests multiple kinds of reasoning at once:
 
-This environment is difficult for agents because it tests multiple kinds of reasoning at once:
-
 - Semantic preservation: the rewritten SQL must still produce the intended result.
 - Security awareness: the agent must distinguish safe parameterization from insecure interpolation.
 - Performance reasoning: the agent must understand why a query is slow, not just that it is slow.
