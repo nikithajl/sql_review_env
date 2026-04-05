@@ -12,13 +12,15 @@
 
 FROM python:3.11-slim
 
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 COPY . .
 
-RUN pip install --no-cache-dir openenv-core fastapi uvicorn pydantic websockets requests openai
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r server/requirements.txt \
+    && pip install --no-cache-dir .
 
 ENV PYTHONPATH="/app:$PYTHONPATH"
 
