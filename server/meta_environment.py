@@ -44,6 +44,59 @@ SCHEMA_SUMMARY = """E-commerce database with 5 tables:
 MAX_STEPS = 3
 
 
+def _build_feedback(score: float, breakdown: dict, grader_type: str) -> str:
+    """Create concise human-readable feedback while keeping full details structured."""
+    if grader_type == "result_set":
+        match = breakdown.get("match", "unknown")
+        row_count = breakdown.get("agent_row_count", 0)
+        if match == "exact":
+            detail = f"Result set exactly matches the reference ({row_count} rows)."
+        elif match == "partial":
+            overlap = breakdown.get("row_overlap_ratio", 0.0)
+            detail = f"Query ran, but the result set only partially matched the reference (overlap {overlap:.3f})."
+        else:
+            detail = "Query ran, but the result set did not match the reference."
+    elif grader_type == "security":
+        missing_required = len(breakdown.get("missing_required", []))
+        vulns_present = len(breakdown.get("vulns_still_present", []))
+        execution_score = breakdown.get("execution_score")
+        detail_parts = []
+        if vulns_present == 0:
+            detail_parts.append("No known vulnerable patterns remained.")
+        else:
+            detail_parts.append(f"{vulns_present} vulnerable pattern(s) were still detected.")
+        if missing_required == 0:
+            detail_parts.append("Required safety constraints were satisfied.")
+        else:
+            detail_parts.append(f"{missing_required} required safety check(s) were still missing.")
+        if execution_score is not None:
+            detail_parts.append(f"Seeded execution equivalence score: {execution_score:.3f}.")
+        detail = " ".join(detail_parts)
+    else:
+        plan_score = breakdown.get("plan_score")
+        explanation_score = breakdown.get("explanation_score")
+        correctness = breakdown.get("correctness", "unknown")
+        detail_parts = [f"Correctness: {correctness}."]
+        if breakdown.get("antipattern_score", 0.0) >= 1.0:
+            detail_parts.append("The target performance anti-pattern was removed.")
+        if plan_score is not None:
+            detail_parts.append(f"Query-plan score: {plan_score:.3f}.")
+        if explanation_score is not None:
+            detail_parts.append(f"Explanation score: {explanation_score:.3f}.")
+        detail = " ".join(detail_parts)
+
+    if score >= 0.9:
+        prefix = "Excellent!"
+    elif score >= 0.6:
+        prefix = "Good attempt."
+    elif score >= 0.3:
+        prefix = "Partial credit."
+    else:
+        prefix = "Needs improvement."
+
+    return f"{prefix} Score: {score:.3f}. {detail}"
+
+
 class SqlReviewEnvironment(Environment):
     """
     SQL Review environment: agent fixes, audits, and optimizes SQL queries.
@@ -124,15 +177,7 @@ class SqlReviewEnvironment(Environment):
             self._state.current_difficulty = task["difficulty"]
 
         score, breakdown = grade(action.sql, self._current_task)
-
-        if score >= 0.9:
-            feedback = f"Excellent! Score: {score:.3f}. {breakdown}"
-        elif score >= 0.6:
-            feedback = f"Good attempt. Score: {score:.3f}. {breakdown}"
-        elif score >= 0.3:
-            feedback = f"Partial credit. Score: {score:.3f}. {breakdown}"
-        else:
-            feedback = f"Needs improvement. Score: {score:.3f}. {breakdown}"
+        feedback = _build_feedback(score, breakdown, self._current_task["grader_type"])
 
         reward_details = SqlReviewReward(
             score=score,
