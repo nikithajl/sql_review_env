@@ -1,8 +1,7 @@
-"""All 9 task definitions for the SQL Review environment."""
+"""All task definitions for the SQL Review environment."""
 
 TASKS: list[dict] = [
-
-    # ── EASY: Bug Fix tasks ──────────────────────────────────────
+    # EASY: Bug fix tasks
     {
         "id": "easy_wrong_join",
         "difficulty": "easy",
@@ -27,14 +26,13 @@ GROUP BY u.id
 ORDER BY u.name;""",
         "grader_type": "result_set",
     },
-
     {
         "id": "easy_missing_filter",
         "difficulty": "easy",
         "description": (
             "The following query should return all products that are NOT soft-deleted "
             "(is_deleted = 0) and have stock_quantity > 0, ordered by price ascending. "
-            "The query is missing the stock_quantity filter — it returns out-of-stock items too. "
+            "The query is missing the stock_quantity filter - it returns out-of-stock items too. "
             "Fix the query. Return only the corrected SQL query, nothing else."
         ),
         "buggy_sql": """SELECT id, name, category, price, stock_quantity
@@ -48,7 +46,6 @@ WHERE is_deleted = 0
 ORDER BY price ASC;""",
         "grader_type": "result_set",
     },
-
     {
         "id": "easy_wrong_aggregate",
         "difficulty": "easy",
@@ -70,8 +67,7 @@ GROUP BY r.product_id
 ORDER BY avg_rating DESC;""",
         "grader_type": "result_set",
     },
-
-    # ── MEDIUM: Security Audit tasks ─────────────────────────────
+    # MEDIUM: Security audit tasks
     {
         "id": "medium_sql_injection",
         "difficulty": "medium",
@@ -104,7 +100,6 @@ ORDER BY avg_rating DESC;""",
             r"is_active\s*=\s*1",
         ],
     },
-
     {
         "id": "medium_data_exposure",
         "difficulty": "medium",
@@ -131,7 +126,6 @@ ORDER BY avg_rating DESC;""",
             r"is_active\s*=\s*1",
         ],
     },
-
     {
         "id": "medium_over_privilege",
         "difficulty": "medium",
@@ -163,14 +157,13 @@ WHERE o.id = ?;""",
             r"order_items",
         ],
     },
-
-    # ── HARD: Performance Optimization tasks ─────────────────────
+    # HARD: Performance optimization tasks
     {
         "id": "hard_correlated_subquery",
         "difficulty": "hard",
         "description": (
-            "The query below uses a correlated subquery to count each user's orders — "
-            "an O(n²) pattern that executes the subquery once per user row. "
+            "The query below uses a correlated subquery to count each user's orders - "
+            "an O(n^2) pattern that executes the subquery once per user row. "
             "Rewrite it using a single JOIN with GROUP BY so the database scans once. "
             "Result must return user name, email, and order_count for all active users, "
             "ordered by order_count descending. Add a SQL comment (--) explaining the fix. "
@@ -192,7 +185,6 @@ ORDER BY order_count DESC;""",
         "grader_type": "performance",
         "slow_hint": "correlated subquery executes once per user row",
     },
-
     {
         "id": "hard_function_on_column",
         "difficulty": "hard",
@@ -216,13 +208,12 @@ ORDER BY created_at;""",
         "grader_type": "performance",
         "slow_hint": "function call on column prevents index usage",
     },
-
     {
         "id": "hard_n_plus_one",
         "difficulty": "hard",
         "description": (
             "The query below fetches product details using a separate subquery per "
-            "order_item row — a classic N+1 pattern. Rewrite it as a single query with "
+            "order_item row - a classic N+1 pattern. Rewrite it as a single query with "
             "proper JOINs returning: item id, order_id, unit_price, quantity, product_name, "
             "product_category for all delivered orders. Add a comment explaining N+1 "
             "and how you fixed it. Return the full SQL query."
@@ -254,5 +245,4 @@ WHERE o.status = 'delivered';""",
     },
 ]
 
-# Quick lookup by task id
-TASK_INDEX: dict[str, dict] = {t["id"]: t for t in TASKS}
+TASK_INDEX: dict[str, dict] = {task["id"]: task for task in TASKS}
