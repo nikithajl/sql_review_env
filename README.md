@@ -284,6 +284,7 @@ Performance task example:
 
 ```text
 sql_review_env/
+|-- Dockerfile
 |-- __init__.py
 |-- client.py
 |-- inference.py
@@ -295,11 +296,11 @@ sql_review_env/
 |-- tests/
 |   |-- test_client.py
 |   |-- test_environment.py
-|   `-- test_graders.py
+|   |-- test_graders.py
+|   `-- test_spec.py
 `-- server/
     |-- __init__.py
     |-- app.py
-    |-- Dockerfile
     |-- graders.py
     |-- meta_environment.py
     |-- schema.sql
@@ -484,7 +485,7 @@ This environment has been validated with:
 
 This environment is intended to evaluate whether agents can:
 
-- understandp SQL semantics
+- understand SQL semantics
 - preserve correctness while fixing bugs
 - identify unsafe query patterns
 - optimize query structure without changing behavior
