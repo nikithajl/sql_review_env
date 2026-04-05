@@ -1,0 +1,66 @@
+spec_version: 1
+name: sql_review_env
+type: space
+runtime: fastapi
+app: server.app:app
+port: 7860
+
+description: >
+  An OpenEnv environment where AI agents act as SQL code reviewers.
+  Given a buggy, insecure, or slow query written against a real
+  e-commerce schema, the agent must return a corrected query.
+
+tasks:
+  - id: easy_wrong_join
+    difficulty: easy
+    grader: result_set
+  - id: easy_missing_filter
+    difficulty: easy
+    grader: result_set
+  - id: easy_wrong_aggregate
+    difficulty: easy
+    grader: result_set
+  - id: medium_sql_injection
+    difficulty: medium
+    grader: security
+  - id: medium_data_exposure
+    difficulty: medium
+    grader: security
+  - id: medium_over_privilege
+    difficulty: medium
+    grader: security
+  - id: hard_correlated_subquery
+    difficulty: hard
+    grader: performance
+  - id: hard_function_on_column
+    difficulty: hard
+    grader: performance
+  - id: hard_n_plus_one
+    difficulty: hard
+    grader: performance
+
+observation_space:
+  task_id: string
+  difficulty: string
+  task_type: string
+  description: string
+  sql_to_review: string
+  schema_summary: string
+  step_number: integer
+  steps_remaining: integer
+  success_threshold: float
+  last_feedback: string|null
+  reward_info:
+    score: float
+    feedback: string
+    breakdown: object|null
+  done: boolean
+  reward: float
+
+action_space:
+  sql: string
+  explanation: string|null
+
+reward:
+  type: float
+  range: [0.0, 1.0]
