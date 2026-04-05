@@ -375,7 +375,7 @@ docker run --rm -p 7860:7860 sql_review_env-env:latest
 
 After startup, the environment should be available on:
 
-- `/`
+- `/` (redirects to `/docs`)
 - `/health`
 - `/docs`
 - `/openapi.json`

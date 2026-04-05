@@ -85,8 +85,8 @@ app.openapi = custom_openapi
 
 @app.get("/")
 async def root():
-    from fastapi.responses import JSONResponse
-    return JSONResponse({"status": "healthy", "name": "sql_review_env"})
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/docs")
 
 
 def main(host: str = "0.0.0.0", port: int = 7860):
