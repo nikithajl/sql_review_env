@@ -54,6 +54,8 @@ observation_space:
     score: float
     feedback: string
     breakdown: object|null
+  done: boolean
+  reward: float
 
 action_space:
   sql: string
