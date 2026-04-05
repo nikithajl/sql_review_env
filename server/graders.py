@@ -5,9 +5,15 @@ from __future__ import annotations
 import pathlib
 import re
 import sqlite3
+from collections import Counter
 from typing import Any
 
 SCHEMA_PATH = pathlib.Path(__file__).parent / "schema.sql"
+SECURITY_PLACEHOLDER_VALUES = {
+    "medium_sql_injection": "'alice@example.com'",
+    "medium_data_exposure": "1",
+    "medium_over_privilege": "1",
+}
 
 
 def _make_connection() -> sqlite3.Connection:
@@ -141,12 +147,60 @@ def _syntax_valid(sql: str) -> tuple[bool, str]:
         conn.close()
 
 
+def _execute_with_task_placeholders(sql: str, task: dict) -> list[dict]:
+    replacement = SECURITY_PLACEHOLDER_VALUES.get(task["id"], "'test_value'")
+    executable_sql = _substitute_placeholders(sql, replacement)
+    conn = _make_connection()
+    try:
+        return _run_query(conn, executable_sql)
+    finally:
+        conn.close()
+
+
+def _semantic_execution_score(agent_sql: str, task: dict) -> tuple[float, dict[str, Any]]:
+    breakdown: dict[str, Any] = {}
+
+    try:
+        ref_rows = _execute_with_task_placeholders(task["reference_sql"], task)
+    except Exception as exc:
+        return 0.0, {"execution_error": f"reference query failed: {exc}"}
+
+    try:
+        agent_rows = _execute_with_task_placeholders(agent_sql, task)
+    except Exception as exc:
+        return 0.0, {"execution_error": str(exc)}
+
+    ref_norm = _normalise_rows(ref_rows)
+    agent_norm = _normalise_rows(agent_rows)
+    breakdown["execution_reference_row_count"] = len(ref_rows)
+    breakdown["execution_agent_row_count"] = len(agent_rows)
+
+    if ref_norm == agent_norm:
+        breakdown["execution_match"] = "exact"
+        return 1.0, breakdown
+
+    overlap = _score_overlap(agent_rows, ref_rows)
+    breakdown["execution_match"] = "partial"
+    breakdown["execution_overlap_ratio"] = round(overlap, 3)
+
+    if len(agent_rows) == len(ref_rows) and overlap >= 0.75:
+        return 0.7, breakdown
+    if overlap > 0.0:
+        return 0.3, breakdown
+    return 0.0, breakdown
+
+
 def _score_overlap(agent_rows: list[dict], ref_rows: list[dict]) -> float:
     ref_norm = _normalise_rows(ref_rows)
     agent_norm = _normalise_rows(agent_rows)
     if not ref_norm:
         return 0.0
-    matching = sum(1 for row in agent_norm if row in ref_norm)
+    ref_counts = Counter(ref_norm)
+    matching = 0
+    for row in agent_norm:
+        if ref_counts[row] > 0:
+            matching += 1
+            ref_counts[row] -= 1
     return matching / len(ref_norm)
 
 
@@ -349,10 +403,11 @@ def grade_result_set(agent_sql: str, task: dict) -> tuple[float, dict]:
 
 def grade_security(agent_sql: str, task: dict) -> tuple[float, dict]:
     """
-    25% vulnerability removal
-    25% required safe patterns
-    30% task-specific semantic constraints
-    20% syntax validity
+    20% vulnerability removal
+    20% required safe patterns
+    25% task-specific semantic constraints
+    25% execution equivalence against a seeded example
+    10% syntax validity
     """
     breakdown: dict[str, Any] = {}
 
@@ -381,15 +436,20 @@ def grade_security(agent_sql: str, task: dict) -> tuple[float, dict]:
     breakdown.update(semantic_breakdown)
     breakdown["semantic_score"] = round(semantic_score, 3)
 
+    execution_score, execution_breakdown = _semantic_execution_score(clean, task)
+    breakdown.update(execution_breakdown)
+    breakdown["execution_score"] = round(execution_score, 3)
+
     syntax_ok, syntax_msg = _syntax_valid(clean)
     syntax_score = 1.0 if syntax_ok else 0.0
     breakdown["syntax"] = syntax_msg
 
     total = (
-        (vuln_score * 0.25)
-        + (req_score * 0.25)
-        + (semantic_score * 0.30)
-        + (syntax_score * 0.20)
+        (vuln_score * 0.20)
+        + (req_score * 0.20)
+        + (semantic_score * 0.25)
+        + (execution_score * 0.25)
+        + (syntax_score * 0.10)
     )
     breakdown["total"] = round(total, 3)
     return round(total, 3), breakdown
@@ -488,6 +548,8 @@ def grade_performance(agent_sql: str, task: dict) -> tuple[float, dict]:
         breakdown["explanation"] = "comment present"
     else:
         breakdown["explanation"] = "no comment found"
+    breakdown["comment_required"] = True
+    breakdown["comment_requirement_met"] = bool(comment_lines)
 
     total = (
         (correctness_score * 0.40)
@@ -495,6 +557,13 @@ def grade_performance(agent_sql: str, task: dict) -> tuple[float, dict]:
         + (plan_score * 0.20)
         + (explanation_score * 0.10)
     )
+    # Hard-task prompts explicitly require a SQL comment explaining the fix.
+    # Cap the score below the environment success threshold when that
+    # requirement is not met so the grader matches the task contract.
+    if not comment_lines and round(total, 3) >= 0.9:
+        total = 0.89
+        breakdown["comment_cap_applied"] = True
+
     breakdown["correctness_score"] = round(correctness_score, 3)
     breakdown["plan_score"] = round(plan_score, 3)
     breakdown["explanation_score"] = round(explanation_score, 3)
