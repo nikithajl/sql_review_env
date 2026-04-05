@@ -42,6 +42,7 @@ The environment serves SQL review tasks across three difficulty bands:
 - `hard`: performance optimization
 
 Each episode gives the agent:
+
 - a task identifier
 - a difficulty label
 - a natural-language problem statement
@@ -110,12 +111,13 @@ The environment returns both:
 
 ## State
 
-The environment exposes the standard OpenEnv state object through `/state`, including:
+The environment exposes the standard OpenEnv state object through `/state`.
+The fields guaranteed for consumers are:
 
 - `episode_id`
 - `step_count`
 
-Task-specific context such as the selected task, difficulty, and latest feedback is returned in observations from `/reset` and `/step`.
+Task-specific context for agents, such as the selected task, difficulty, and latest feedback, should be read from observations returned by `/reset` and `/step`.
 
 ## Underlying Schema
 
@@ -174,9 +176,10 @@ Easy tasks use result-set grading:
 
 Medium tasks use a security grader that combines:
 
-- Vulnerability-pattern removal
-- Required safety constraints such as parameterization and active-user filtering
-- Task-specific semantic checks on selected columns, table usage, and access restrictions
+- vulnerability-pattern removal
+- required safety constraints such as parameterization and active-user filtering
+- task-specific semantic checks on selected columns, table usage, and access restrictions
+- execution equivalence against seeded examples from the reference query
 - SQL syntax validity
 
 This provides partial credit for answers that improve safety even if they are not fully correct.
@@ -185,10 +188,10 @@ This provides partial credit for answers that improve safety even if they are no
 
 Hard tasks use a performance grader that combines:
 
-- Correctness against the reference result set
-- Task-specific anti-pattern removal
-- Query-plan quality using `EXPLAIN QUERY PLAN`
-- Explanation quality via SQL comments
+- correctness against the reference result set
+- task-specific anti-pattern removal
+- query-plan quality using `EXPLAIN QUERY PLAN`
+- explanation quality via SQL comments
 
 This rewards agents that preserve semantics while also removing the actual performance anti-pattern, not just rewriting the query superficially.
 
@@ -196,11 +199,11 @@ This rewards agents that preserve semantics while also removing the actual perfo
 
 This environment is difficult for agents because it tests multiple kinds of reasoning at once:
 
-- Semantic preservation: the rewritten SQL must still produce the intended result.
-- Security awareness: the agent must distinguish safe parameterization from insecure interpolation.
-- Performance reasoning: the agent must understand why a query is slow, not just that it is slow.
-- Feedback utilization: the agent must use structured grader feedback to improve over multiple steps.
-- Cross-domain competence: correctness, security, and performance tasks require different solution patterns.
+- semantic preservation: the rewritten SQL must still produce the intended result
+- security awareness: the agent must distinguish safe parameterization from insecure interpolation
+- performance reasoning: the agent must understand why a query is slow, not just that it is slow
+- feedback utilization: the agent must use structured grader feedback to improve over multiple steps
+- cross-domain competence: correctness, security, and performance tasks require different solution patterns
 
 The benchmark is designed to distinguish between queries that merely look plausible and queries that are actually correct, safe, and meaningfully improved. This makes it more realistic than single-mode SQL generation tasks.
 
@@ -208,11 +211,11 @@ The benchmark is designed to distinguish between queries that merely look plausi
 
 This environment is designed to surface realistic agent mistakes, including:
 
-- Generating syntactically valid SQL that changes the result set.
-- Fixing one bug while preserving another.
-- Removing obvious vulnerabilities but forgetting required access constraints.
-- Producing a correct query that is still inefficient.
-- Adding comments or explanations without actually improving the query plan.
+- generating syntactically valid SQL that changes the result set
+- fixing one bug while preserving another
+- removing obvious vulnerabilities but forgetting required access constraints
+- producing a correct query that is still inefficient
+- adding comments or explanations without actually improving the query plan
 
 These failure modes matter in real engineering settings, and the benchmark is designed to detect them.
 
@@ -267,6 +270,7 @@ Security task example:
 
 Performance task example:
 
+```json
 {
   "action": {
     "sql": "-- Replaced the correlated subquery with a single join and aggregation\nSELECT u.name, u.email, COUNT(o.id) AS order_count FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE u.is_active = 1 GROUP BY u.id, u.name, u.email ORDER BY order_count DESC;",
@@ -274,27 +278,32 @@ Performance task example:
   },
   "task_id": "hard_correlated_subquery"
 }
+```
 
 ## Project Structure
 
 ```text
 sql_review_env/
-├── __init__.py
-├── client.py
-├── inference.py
-├── models.py
-├── openenv.yaml
-├── pyproject.toml
-├── README.md
-├── smoke_test.py
-└── server/
-    ├── __init__.py
-    ├── app.py
-    ├── Dockerfile
-    ├── graders.py
-    ├── meta_environment.py
-    ├── schema.sql
-    └── tasks.py
+|-- __init__.py
+|-- client.py
+|-- inference.py
+|-- models.py
+|-- openenv.yaml
+|-- pyproject.toml
+|-- README.md
+|-- smoke_test.py
+|-- tests/
+|   |-- test_client.py
+|   |-- test_environment.py
+|   `-- test_graders.py
+`-- server/
+    |-- __init__.py
+    |-- app.py
+    |-- Dockerfile
+    |-- graders.py
+    |-- meta_environment.py
+    |-- schema.sql
+    `-- tasks.py
 ```
 
 ## Running Locally
@@ -339,6 +348,16 @@ Run:
 python smoke_test.py
 ```
 
+## Unit Tests
+
+A lightweight built-in test suite covers the client contract, environment reset/step semantics, and grader alignment.
+
+Run:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
 ## Docker
 
 ### Build the container
@@ -354,6 +373,7 @@ docker run --rm -p 7860:7860 sql_review_env-env:latest
 ```
 
 After startup, the environment should be available on:
+
 - `/`
 - `/health`
 - `/docs`
@@ -364,7 +384,7 @@ The main interaction endpoints, including `/reset`, `/step`, and `/state`, are d
 ## Hugging Face Spaces
 
 This environment is deployed as a Docker-based Hugging Face Space tagged with `openenv`.
-The Space runs the FastAPI server and exposes the OpenEnv endpoints over HTTP and WebSocket.
+The Space runs the FastAPI server and exposes the OpenEnv HTTP endpoints for the environment.
 
 ## Baseline Inference Script
 
@@ -377,6 +397,7 @@ Required environment variables:
 - `HF_TOKEN`: API token for model access
 
 Recommended compatibility:
+
 - support `OPENAI_API_KEY` as an alternative credential if needed
 
 Run the baseline:
@@ -387,17 +408,19 @@ python inference.py
 
 Expected behavior:
 
-- Connects to the deployed environment.
-- Runs the model over all tasks.
-- Records per-task scores.
-- Writes a reproducible summary to `baseline_scores.json`.
+- connects to the deployed environment
+- runs the model over all tasks
+- records per-task scores
+- writes a reproducible summary to `baseline_scores.json`
 
 ## Baseline Results
 
 Baseline run details:
 
+- Date: `2026-04-05`
 - Model: `meta-llama/Llama-3.3-70B-Instruct`
 - API base URL: `https://router.huggingface.co/v1`
+- Env URL: `https://nikithajl-sql-review-env.hf.space`
 - Temperature: `0.0`
 
 Per-task results:
@@ -425,15 +448,14 @@ These results were generated by running `python inference.py` against the deploy
 
 This environment includes:
 
-- Typed action and observation models.
-- Structured reward details through reward_info.
-- `reset()`, `step()`, and `state()` semantics.
+- typed action and observation models
+- structured reward details through `reward_info`
+- `reset()`, `step()`, and `state()` semantics
 - `openenv.yaml`
-- Deterministic task graders.
-- Dockerized deployment for Hugging Face Spaces.
+- deterministic task graders
+- Dockerized deployment for Hugging Face Spaces
 
 The grading logic is deterministic and includes task-specific semantic checks for security and performance tasks, rather than relying only on surface-level pattern matching.
-
 
 Validate the environment with:
 
@@ -445,17 +467,18 @@ openenv validate
 
 This environment has been validated with:
 
-- Successful Hugging Face Space deployment.
-- Working /health, /docs, /openapi.json, /reset, and /step endpoints.
-- Successful openenv validate.
-- Successful baseline execution through python inference.py.
+- successful Hugging Face Space deployment
+- working `/health`, `/docs`, `/openapi.json`, `/reset`, and `/step` endpoints
+- successful `openenv validate`
+- successful `python -m unittest discover -s tests -v`
+- successful baseline execution through `python inference.py`
 
 ## Notes for Evaluation
 
 This environment is intended to evaluate whether agents can:
 
-- Understand SQL semantics.
-- Preserve correctness while fixing bugs.
-- Identify unsafe query patterns.
-- Optimize query structure without changing behavior.
-- Improve incrementally based on grader feedback.
+- understand SQL semantics
+- preserve correctness while fixing bugs
+- identify unsafe query patterns
+- optimize query structure without changing behavior
+- improve incrementally based on grader feedback
