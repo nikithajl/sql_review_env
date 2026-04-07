@@ -14,6 +14,7 @@ SECURITY_PLACEHOLDER_VALUES = {
     "medium_data_exposure": "1",
     "medium_over_privilege": "1",
 }
+SCORE_EPSILON = 0.001
 
 
 def _make_connection() -> sqlite3.Connection:
@@ -204,6 +205,16 @@ def _score_overlap(agent_rows: list[dict], ref_rows: list[dict]) -> float:
     return matching / len(ref_norm)
 
 
+def _normalize_score(score: float, breakdown: dict[str, Any]) -> tuple[float, dict[str, Any]]:
+    """Keep public scores strictly inside (0, 1) for submission validation."""
+    clamped = max(0.0, min(1.0, float(score)))
+    normalized = min(1.0 - SCORE_EPSILON, max(SCORE_EPSILON, clamped))
+    if normalized != clamped:
+        breakdown["raw_score"] = round(clamped, 3)
+    breakdown["normalized_score"] = round(normalized, 3)
+    return round(normalized, 3), breakdown
+
+
 def _score_selected_columns(
     sql: str,
     required: set[str] | None = None,
@@ -361,7 +372,7 @@ def grade_result_set(agent_sql: str, task: dict) -> tuple[float, dict]:
     breakdown: dict[str, Any] = {}
 
     if not agent_sql or not agent_sql.strip():
-        return 0.0, {"error": "empty submission"}
+        return _normalize_score(0.0, {"error": "empty submission"})
 
     ref_conn = _make_connection()
     try:
@@ -387,16 +398,16 @@ def grade_result_set(agent_sql: str, task: dict) -> tuple[float, dict]:
 
     if ref_norm == agent_norm:
         breakdown["match"] = "exact"
-        return 1.0, breakdown
+        return _normalize_score(1.0, breakdown)
 
     if len(agent_rows) == len(ref_rows):
         ratio = _score_overlap(agent_rows, ref_rows)
         breakdown["match"] = "partial"
         breakdown["row_overlap_ratio"] = round(ratio, 3)
-        return (0.6 if ratio >= 0.5 else 0.3), breakdown
+        return _normalize_score((0.6 if ratio >= 0.5 else 0.3), breakdown)
 
     breakdown["match"] = "wrong"
-    return 0.3, breakdown
+    return _normalize_score(0.3, breakdown)
 
 
 # Medium: security grader
@@ -412,7 +423,7 @@ def grade_security(agent_sql: str, task: dict) -> tuple[float, dict]:
     breakdown: dict[str, Any] = {}
 
     if not agent_sql or not agent_sql.strip():
-        return 0.0, {"error": "empty submission"}
+        return _normalize_score(0.0, {"error": "empty submission"})
 
     clean = _strip_comments(agent_sql)
 
@@ -451,8 +462,9 @@ def grade_security(agent_sql: str, task: dict) -> tuple[float, dict]:
         + (execution_score * 0.25)
         + (syntax_score * 0.10)
     )
-    breakdown["total"] = round(total, 3)
-    return round(total, 3), breakdown
+    normalized, breakdown = _normalize_score(total, breakdown)
+    breakdown["total"] = normalized
+    return normalized, breakdown
 
 
 # Hard: performance grader
@@ -467,7 +479,7 @@ def grade_performance(agent_sql: str, task: dict) -> tuple[float, dict]:
     breakdown: dict[str, Any] = {}
 
     if not agent_sql or not agent_sql.strip():
-        return 0.0, {"error": "empty submission"}
+        return _normalize_score(0.0, {"error": "empty submission"})
 
     exec_sql = "\n".join(
         line for line in agent_sql.splitlines() if not line.strip().startswith("--")
@@ -567,8 +579,9 @@ def grade_performance(agent_sql: str, task: dict) -> tuple[float, dict]:
     breakdown["correctness_score"] = round(correctness_score, 3)
     breakdown["plan_score"] = round(plan_score, 3)
     breakdown["explanation_score"] = round(explanation_score, 3)
-    breakdown["total"] = round(total, 3)
-    return round(total, 3), breakdown
+    normalized, breakdown = _normalize_score(total, breakdown)
+    breakdown["total"] = normalized
+    return normalized, breakdown
 
 
 # Dispatcher

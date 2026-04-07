@@ -1,6 +1,6 @@
 import unittest
 
-from sql_review_env.server.graders import grade_performance, grade_security
+from sql_review_env.server.graders import grade, grade_performance, grade_security
 from sql_review_env.server.tasks import TASK_INDEX
 
 
@@ -62,6 +62,18 @@ class GraderTests(unittest.TestCase):
         self.assertLess(score, 0.9)
         self.assertLess(breakdown["execution_score"], 1.0)
         self.assertIn("execution_match", breakdown)
+
+    def test_all_reference_scores_are_in_open_interval(self) -> None:
+        for task in TASK_INDEX.values():
+            score, _ = grade(task["reference_sql"], task)
+            self.assertGreater(score, 0.0, task["id"])
+            self.assertLess(score, 1.0, task["id"])
+
+    def test_empty_submission_score_is_in_open_interval(self) -> None:
+        for task in TASK_INDEX.values():
+            score, _ = grade("", task)
+            self.assertGreater(score, 0.0, task["id"])
+            self.assertLess(score, 1.0, task["id"])
 
 
 if __name__ == "__main__":

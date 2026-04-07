@@ -41,9 +41,11 @@ class EnvironmentTests(unittest.TestCase):
         )
 
         self.assertTrue(observation.done)
-        self.assertEqual(observation.reward, 1.0)
+        self.assertGreater(observation.reward, 0.0)
+        self.assertLess(observation.reward, 1.0)
         self.assertIsNotNone(observation.reward_info)
-        self.assertEqual(observation.reward_info.score, 1.0)
+        self.assertGreater(observation.reward_info.score, 0.0)
+        self.assertLess(observation.reward_info.score, 1.0)
         self.assertEqual(observation.steps_remaining, 2)
 
 

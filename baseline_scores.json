@@ -1,10 +1,10 @@
 {
   "model": "meta-llama/Llama-3.3-70B-Instruct",
   "scores": {
-    "easy_wrong_join": 1.0,
-    "easy_missing_filter": 1.0,
-    "easy_wrong_aggregate": 1.0,
-    "medium_sql_injection": 1.0,
+    "easy_wrong_join": 0.999,
+    "easy_missing_filter": 0.999,
+    "easy_wrong_aggregate": 0.999,
+    "medium_sql_injection": 0.999,
     "medium_data_exposure": 0.85,
     "medium_over_privilege": 0.982,
     "hard_correlated_subquery": 0.742,
@@ -12,9 +12,9 @@
     "hard_n_plus_one": 0.944
   },
   "summary": {
-    "easy_mean": 1.0,
+    "easy_mean": 0.999,
     "medium_mean": 0.944,
     "hard_mean": 0.842,
-    "overall_mean": 0.929
+    "overall_mean": 0.928
   }
 }
