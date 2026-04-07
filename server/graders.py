@@ -206,7 +206,6 @@ def _score_overlap(agent_rows: list[dict], ref_rows: list[dict]) -> float:
 
 
 def _normalize_score(score: float, breakdown: dict[str, Any]) -> tuple[float, dict[str, Any]]:
-    """Keep public scores strictly inside (0, 1) for submission validation."""
     clamped = max(0.0, min(1.0, float(score)))
     normalized = min(1.0 - SCORE_EPSILON, max(SCORE_EPSILON, clamped))
     if normalized != clamped:
